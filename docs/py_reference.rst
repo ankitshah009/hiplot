@@ -1,5 +1,5 @@
 
-HiPlot classes reference
+Python classes reference
 ========================
 
 :class:`hiplot.Experiment`
@@ -8,11 +8,21 @@ HiPlot classes reference
 .. autoclass:: hiplot.Experiment
    :members:
 
+.. autoclass:: hiplot.Displays
+   :members:
+
 
 :class:`hiplot.Datapoint`
 --------------------------------
 
 .. autoclass:: hiplot.Datapoint
+   :members:
+
+
+:class:`hiplot.ExperimentDisplayed`
+-----------------------------------
+
+.. autoclass:: hiplot.ExperimentDisplayed
    :members:
 
 

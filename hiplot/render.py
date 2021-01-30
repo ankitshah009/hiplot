@@ -3,13 +3,11 @@
 # LICENSE file in the root directory of this source tree.
 
 
+import uuid
 import base64
 import json
 from typing import Any, Dict
 from pathlib import Path
-
-from bs4 import BeautifulSoup
-import jinja2
 
 
 def escapejs(val: Any) -> str:
@@ -17,6 +15,7 @@ def escapejs(val: Any) -> str:
 
 
 def render_jinja_html(template_loc: str, file_name: str) -> str:
+    import jinja2
     return jinja2.Environment(loader=jinja2.FileSystemLoader(template_loc + "/")).get_template(file_name).render()
 
 
@@ -25,6 +24,7 @@ def html_inlinize(html: str, replace_local: bool = True) -> str:
     Includes external CSS, JS and images directly in the HTML
     (only for files with a relative path)
     """
+    from bs4 import BeautifulSoup
     SUFFIX_TO_TYPE = {
         '.png': 'image/png',
         '.svg': 'image/svg+xml',
@@ -43,7 +43,7 @@ def html_inlinize(html: str, replace_local: bool = True) -> str:
                 href = href[1:]
             file = Path(static_root, href)
             new_tag = soup.new_tag("style")
-            new_tag.string = file.read_text()
+            new_tag.string = file.read_text(encoding="utf-8")
             i.replace_with(new_tag)
         elif i["rel"][0] == "icon":  # Favicon
             file = Path(static_root, href)
@@ -62,7 +62,8 @@ def html_inlinize(html: str, replace_local: bool = True) -> str:
             src = src[1:]
         file = Path(static_root, src)
         new_tag = soup.new_tag("script")
-        new_tag.string = file.read_text()
+        new_tag.string = file.read_text(encoding="utf-8")
+        new_tag["type"] = i["type"]
         i.replace_with(new_tag)
     return str(soup)
 
@@ -73,11 +74,12 @@ def get_index_html_template() -> str:
 
 def make_experiment_standalone_page(options: Dict[str, Any]) -> str:
     hiplot_options = {
-        'is_webserver': False
+        'dataProviderName': 'none'
     }
     hiplot_options.update(options)
 
-    index_html = html_inlinize(get_index_html_template())
+    index_html = get_index_html_template()
+    index_html = index_html.replace("hiplot_element_id", f"hiplot_{uuid.uuid4().hex}")
     index_html = index_html.replace(
         "/*ON_LOAD_SCRIPT_INJECT*/",
         f"""/*ON_LOAD_SCRIPT_INJECT*/

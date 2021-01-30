@@ -3,7 +3,11 @@
 # LICENSE file in the root directory of this source tree.
 
 import tempfile
+import shutil
+
 import pytest
+import pandas as pd
+
 import hiplot as hip
 
 
@@ -23,6 +27,34 @@ def test_from_iterable() -> None:
     assert len(xp.datapoints) == 2
     xp.validate()
     xp._asdict()
+
+
+def test_from_dataframe() -> None:
+    df = pd.DataFrame([{"uid": 1, "k": "v1"}, {"uid": 2, "k": "v2"}])
+    xp = hip.Experiment.from_dataframe(df)
+    assert len(xp.datapoints) == 2
+    xp.validate()
+    xp._asdict()
+
+def test_from_dataframe_nan_values() -> None:
+    # Pandas automatically convert numeric-based columns None to NaN in dataframes
+    # Pandas will also automatically convert columns with NaN from integer to floats, since NaN is considered a float
+    # https://pandas.pydata.org/pandas-docs/stable/user_guide/integer_na.html
+
+    df = pd.DataFrame(data={'uid':[1,2,3,4],'from_uid':[None,1,2,3],'a':[1,2,3,None],'b':[4,5,None,6]})
+    xp = hip.Experiment.from_dataframe(df)
+    assert len(xp.datapoints) == 4
+    xp.validate()
+    xp._asdict()
+
+def test_from_dataframe_none_values() -> None:
+    # Pandas will keep None values in string columns
+    df = pd.DataFrame(data={'uid':["1","2","3","4"],'from_uid':[None,"1","2","3"],'a':[23,43,5,None],'b':[33,45,None,23]})
+    xp = hip.Experiment.from_dataframe(df)
+    assert len(xp.datapoints) == 4
+    xp.validate()
+    xp._asdict()
+
 
 
 def test_validation() -> None:
@@ -52,18 +84,32 @@ def test_validation_missing_parent() -> None:
 
 
 def test_export_csv() -> None:
-    tmpfile = tempfile.NamedTemporaryFile().name
+    with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8") as tmpfile:
+        xp = hip.Experiment.from_iterable([{"uid": 1, "k": "v"}, {"uid": 2, "k": "vk", "k2": "vk2"}])
+        xp.to_csv(tmpfile)
+        xp.validate()
 
-    xp = hip.Experiment.from_iterable([{"uid": 1, "k": "v"}, {"uid": 2, "k": "vk", "k2": "vk2"}])
-    xp.to_csv(tmpfile)
-    xp.validate()
-    xp2 = hip.Experiment.from_csv(tmpfile)
-    xp2.validate()
+        tmpfile.seek(0)
+        xp2 = hip.Experiment.from_csv(tmpfile)
+        assert len(xp2.datapoints) == 2
+        xp2.validate()
 
 
 def test_to_html() -> None:
     xp = hip.Experiment.from_iterable([{"uid": 1, "k": "v"}, {"uid": 2, "k": "vk", "k2": "vk2"}])
-    xp.to_html(tempfile.NamedTemporaryFile().name)
+    xp.to_html(tempfile.TemporaryFile(mode="w", encoding="utf-8"))
+
+
+def test_to_filename() -> None:
+    dirpath = tempfile.mkdtemp()
+    try:
+        xp = hip.Experiment.from_iterable([{"uid": 1, "k": "v"}, {"uid": 2, "k": "vk", "k2": "vk2"}])
+        xp.to_html(dirpath + "/xp.html")
+        csv_path = dirpath + "/xp.csv"
+        xp.to_csv(csv_path)
+        hip.Experiment.from_csv(csv_path).validate()
+    finally:
+        shutil.rmtree(dirpath)
 
 
 def test_doc() -> None:
@@ -72,28 +118,9 @@ def test_doc() -> None:
 
     # Change column type
     exp.parameters_definition["optionA"].type = hip.ValueType.NUMERIC_LOG
+    # Force a column minimum/maximum values
+    exp.parameters_definition["pct_success"].force_range(0, 100)
+    # Change d3 colormap (https://github.com/d3/d3-scale-chromatic) for non-categorical columns
+    exp.parameters_definition["exp_metric"].colormap = "interpolateSinebow"
     # EXPERIMENT_SETTINGS_SNIPPET1_END
-    # EXPERIMENT_SETTINGS_SNIPPET2_BEGIN
-    # Provide configuration for the parallel plot
-    exp.display_data(hip.Displays.PARALLEL_PLOT).update({
-        # Hide some columns
-        'hide': ['optionB'],
-        # Specify the order for others
-        'order': ['time'],  # Put column time first on the left
-    })
-
-    # Provide configuration for the XY graph
-    exp.display_data(hip.Displays.XY).update({
-        # Default X axis for the XY plot
-        'axis_x': 'time',
-        # Default Y axis
-        'axis_y': 'lr',
-        # Configure lines
-        'lines_thickness': 1.0,
-        'lines_opacity': 0.1,
-        # Configure dots
-        'dots_thickness': 2.0,
-        'dots_opacity': 0.3,
-    })
-    # EXPERIMENT_SETTINGS_SNIPPET2_END
     exp.validate()

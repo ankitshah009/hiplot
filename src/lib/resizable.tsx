@@ -5,22 +5,26 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-//@ts-ignore
-import style from "./resizable.css";
+import style from "./resizable.scss";
 import $ from "jquery";
 import React from "react";
+import _ from "underscore";
 
 
 interface ResizableHProps {
     initialHeight: number;
-    onResize: (height: number) => void;
+    onResize: (height: number, width: number) => void;
     borderSize: number;
     minHeight: number;
+
+    onRemove?: () => void;
 };
 
 interface ResizableHState {
     height: number;
+    width: number;
     internalHeight: number;
+    removing: boolean;
 };
 
 export class ResizableH extends React.Component<ResizableHProps, ResizableHState> {
@@ -30,13 +34,15 @@ export class ResizableH extends React.Component<ResizableHProps, ResizableHState
     constructor(props: ResizableHProps) {
         super(props);
         this.state = {
+            width: 0,
             height: this.props.initialHeight,
             internalHeight: this.props.initialHeight,
+            removing: false,
         };
     }
     static defaultProps = {
         borderSize: 4,
-        minHeight: 50,
+        minHeight: 100,
     }
     componentDidMount() {
         var div = $(this.div_ref.current);
@@ -48,19 +54,23 @@ export class ResizableH extends React.Component<ResizableHProps, ResizableHState
         }.bind(this));
 
         document.addEventListener("mouseup", this.onMouseUp);
+        $(window).on("resize", this.onWindowResize);
+        this.setState({width: this.div_ref.current.parentElement.offsetWidth});
     }
     componentDidUpdate(prevProps, prevState) {
-        if (prevState.height != this.state.height) {
-            this.props.onResize(this.state.height);
+        if (prevState.height != this.state.height || prevState.width != this.state.width) {
+            this.props.onResize(this.state.height, this.state.width);
         }
     }
     componentWillUnmount() {
         document.removeEventListener("mousemove", this.onMouseMove, false);
         document.removeEventListener("mouseup", this.onMouseUp);
+        $(window).off("resize", this.onWindowResize);
+        this.onWindowResize.cancel();
     }
     render() {
         return (
-            <div ref={this.div_ref} style={{"height": this.state.height}} className={style.resizableH}>{this.props.children}</div>
+            <div ref={this.div_ref} style={{"height": this.state.height}} className={`${style.resizableH} ${this.state.removing ? style.pendingDelete : ""}`}>{this.props.children}</div>
         );
     }
     onMouseMove = function(e: MouseEvent) {
@@ -72,6 +82,7 @@ export class ResizableH extends React.Component<ResizableHProps, ResizableHState
                 height: Math.max(this.props.minHeight, internalHeight),
                 internalHeight: internalHeight,
                 position: e.clientY,
+                removing: this.props.onRemove && internalHeight < this.props.minHeight,
             });
         }
     }.bind(this)
@@ -81,5 +92,13 @@ export class ResizableH extends React.Component<ResizableHProps, ResizableHState
         }
         this.m_pos = null;
         document.removeEventListener("mousemove", this.onMouseMove, false);
+        if (this.props.onRemove && this.state.removing) {
+            this.props.onRemove();
+        }
     }.bind(this)
+    onWindowResize = _.debounce(function(this: ResizableH) {
+        if (this.div_ref.current) {
+            this.setState({width: this.div_ref.current.offsetWidth});
+        }
+    }.bind(this), 100);
 }

@@ -2,18 +2,25 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+import unittest.mock
 from html.parser import HTMLParser
-from typing import List, Tuple, Optional
+import typing as tp
 from bs4 import BeautifulSoup
-from .fetchers import README_DEMOS
+from .fetchers_demo import README_DEMOS
 from .render import get_index_html_template
 
 
-def test_ipython_demos() -> None:
+@unittest.mock.patch('hiplot.experiment._is_running_ipython', new=lambda: True)
+def test_demos_ipython() -> None:
     for k, v in README_DEMOS.items():
         print(k)
         v().display()
 
+@unittest.mock.patch('streamlit._is_running_with_streamlit', new=True, create=True)
+def test_demos_streamlit() -> None:
+    for k, v in README_DEMOS.items():
+        print(k)
+        v().display_st(ret='selected_uids', key=f'hiplot{k}')
 
 def test_index_html_valid() -> None:
     """
@@ -26,10 +33,10 @@ def test_index_html_valid() -> None:
     class MyHTMLParser(HTMLParser):
         def __init__(self, data: str) -> None:
             super().__init__()
-            self.content: List[str] = []
+            self.content: tp.List[str] = []
             self.feed(data)
 
-        def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
+        def handle_starttag(self, tag: str, attrs: tp.List[tp.Tuple[str, tp.Optional[str]]]) -> None:
             attrs.sort(key=lambda x: x[0])
             attrs_rendered = " ".join([a[0] + '=' + a[1] if a[1] is not None else a[0] for a in attrs])
             self.content.append(f'<{tag} {attrs_rendered}>')

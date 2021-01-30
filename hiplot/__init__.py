@@ -5,6 +5,12 @@
 from .experiment import (Experiment, ExperimentFetcherDoesntApply, ExperimentValidationError, ExperimentValidationCircularRef,
                          ExperimentValidationMissingParent, Datapoint, ExperimentDisplayed, ValueDef, ValueType, Displays)
 from .server import run_server, run_server_main
+from .pkginfo import version as __version__, package_name
+
 from . import fetchers
 
-__version__ = "0.1.1"
+__all__ = [
+    'Experiment', 'ExperimentFetcherDoesntApply', 'ExperimentValidationError', 'ExperimentValidationCircularRef',
+    'ExperimentValidationMissingParent', 'Datapoint', 'ExperimentDisplayed', 'ValueDef', 'ValueType', 'Displays',
+    'fetchers', 'run_server', 'run_server_main', "__version__", "__package__", "package_name"
+]

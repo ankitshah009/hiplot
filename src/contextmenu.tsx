@@ -33,7 +33,9 @@ export class ContextMenu extends React.Component<ContextMenuProps, ContextMenuSt
             left: 0,
         };
         this.hide = function() {
-            this.setState({visible: false});
+            if (this.state.visible) {
+                this.setState({visible: false});
+            }
         }.bind(this);
         $(window).on("click", this.hide);
     }
@@ -43,14 +45,21 @@ export class ContextMenu extends React.Component<ContextMenuProps, ContextMenuSt
     removeCallbacks(obj: any) {
         this.trigger_callbacks = this.trigger_callbacks.filter(trigger => trigger.obj != obj);
     }
-    show(x: number, y: number, column: string) {
+    show(pageX: number, pageY: number, column: string) {
+        // This assumes parent has `relative` positioning
+        var parent = $(this.context_menu_div.current.parentElement).offset();
         this.setState({
-            top: y - 10,
-            left: Math.max(0, x - 90),
+            top: Math.max(0, pageY - 10 - parent.top),
+            left: Math.max(0, pageX - 90 - parent.left),
             visible: true,
             column: column
         });
     }
+    onContextMenu = function(this: ContextMenu, event: React.MouseEvent<HTMLDivElement>): void {
+        this.show(event.pageX, event.pageY, '');
+        event.preventDefault();
+        event.stopPropagation();
+    }.bind(this);
     componentWillUnmount() {
         $(window).off("click", this.hide);
     }
@@ -60,7 +69,9 @@ export class ContextMenu extends React.Component<ContextMenuProps, ContextMenuSt
         cm.style.top = `${this.state.top}px`;
         cm.style.left = `${this.state.left}px`;
         cm.classList.toggle('show', this.state.visible);
-        if (this.state.visible && !prevState.visible) {
+        const needsUpdate = (this.state.visible && !prevState.visible) ||
+            (this.state.column != prevState.column);
+        if (needsUpdate) {
             cm.innerHTML = '';
             var me = this;
             this.trigger_callbacks.forEach(function(trigger) {
@@ -69,6 +80,6 @@ export class ContextMenu extends React.Component<ContextMenuProps, ContextMenuSt
         }
     }
     render() {
-        return (<div ref={this.context_menu_div} className="dropdown-menu dropdown-menu-sm context-menu"></div>);
+        return (<div ref={this.context_menu_div} className="dropdown-menu dropdown-menu-sm context-menu" style={{"fontSize": 16}}></div>);
     }
 };

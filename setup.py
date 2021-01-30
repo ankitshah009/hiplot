@@ -7,6 +7,7 @@
 import re
 import os
 import sys
+import importlib.util
 from pathlib import Path
 from typing import Dict, List
 from setuptools import setup, find_packages
@@ -15,28 +16,18 @@ from setuptools.command.install import install
 
 requirements: Dict[str, List[str]] = {}
 for extra in ["dev", "main"]:
-    requirements[extra] = Path(f"requirements/{extra}.txt").read_text().splitlines()
+    # Skip `package @ git+[repo_url]` because not supported by pypi
+    requirements[extra] = [r
+                           for r in Path(f"requirements/{extra}.txt").read_text().splitlines()
+                           if '@' not in r
+                           ]
 
 
-# Find version number in __init__
-init_str = Path("hiplot/__init__.py").read_text()
-match = re.search(r"^__version__ = \"(?P<version>[\w\.]+?)\"$", init_str, re.MULTILINE)
-assert match is not None, "Could not find version in hiplot/__init__.py"
-version = match.group("version")
-
-
-class VerifyVersionCommand(install):
-    """Custom command to verify that the git tag matches our version"""
-    description = 'verify that the git tag matches our version'
-
-    def run(self):
-        tag = os.getenv('CIRCLE_TAG')
-
-        if tag != version:
-            info = "Git tag: {0} does not match the version of this app: {1}".format(
-                tag, version
-            )
-            sys.exit(info)
+# Find version number
+spec = importlib.util.spec_from_file_location("hiplot.pkginfo", str(Path(__file__).parent / "hiplot" / "pkginfo.py"))
+pkginfo = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(pkginfo)
+version = pkginfo.version
 
 
 def readme() -> str:
@@ -44,21 +35,18 @@ def readme() -> str:
 
 
 setup(
-    name="hiplot",
+    name="hiplot",  # CI_PACKAGE_NAME: replaced by ci for hiplot-master
     version=version,
     description="High dimensional Interactive Plotting tool",
     long_description=readme(),
     long_description_content_type="text/markdown",
     url='https://github.com/facebookresearch/hiplot',
     author="Facebook AI Research",
-    packages=find_packages(),
+    packages=["hiplot"],
     install_requires=requirements["main"],
     extras_require={"dev": requirements["dev"]},
-    package_data={"hiplot": ["py.typed", "static/*", "static/*/*", "static/*/*/*", "templates/**"]},
+    package_data={"hiplot": ["py.typed", "static/*", "static/built/*", "static/built/streamlit_component/*", "templates/*"]},
     include_package_data=True,
     scripts=['scripts/hiplot', 'scripts/hiplot-render'],
     python_requires='>=3.6',
-    cmdclass={
-        'verify': VerifyVersionCommand,
-    }
 )
